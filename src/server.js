@@ -12,21 +12,17 @@ connectDB();
 
 const app = express();
 
-// CORS Configuration
-const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://srich-client.vercel.app',
-    /\.vercel\.app$/  // Allow all Vercel subdomains
-  ],
+// CORS Configuration - Allow all origins for API
+app.use(cors({
+  origin: true,  // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
-// Middleware
-app.use(cors(corsOptions));
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 app.use(morgan('dev'));
 
