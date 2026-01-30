@@ -33,6 +33,7 @@ app.use('/api/clinical-cases', require('./routes/clinicalCase.routes'));
 app.use('/api/attendance', require('./routes/attendance.routes'));
 app.use('/api/leave-requests', require('./routes/leaveRequest.routes'));
 app.use('/api/statistics', require('./routes/statistics.routes'));
+app.use('/api/professor', require('./routes/professor.routes'));
 
 // Health check route
 app.get('/api/health', (req, res) => {

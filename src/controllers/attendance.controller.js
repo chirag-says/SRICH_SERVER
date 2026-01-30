@@ -4,24 +4,28 @@ const User = require('../models/User.model');
 // @desc    Check in
 // @route   POST /api/attendance/check-in
 // @access  Private
+// @desc    Check in
+// @route   POST /api/attendance/check-in
+// @access  Private
 exports.checkIn = async (req, res) => {
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Check if already checked in today
-        const existingAttendance = await Attendance.findOne({
+        // Check if already checked in (active session)
+        const activeSession = await Attendance.findOne({
             student: req.user.id,
             date: {
                 $gte: today,
                 $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-            }
+            },
+            timeOut: null
         });
 
-        if (existingAttendance) {
+        if (activeSession) {
             return res.status(400).json({
                 success: false,
-                message: 'You have already checked in today'
+                message: 'You are already checked in. Please check out first.'
             });
         }
 
@@ -55,37 +59,43 @@ exports.checkOut = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // Find active session for today
         const attendance = await Attendance.findOne({
             student: req.user.id,
             date: {
                 $gte: today,
                 $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-            }
+            },
+            timeOut: null
         });
 
         if (!attendance) {
             return res.status(404).json({
                 success: false,
-                message: 'No check-in record found for today'
-            });
-        }
-
-        if (attendance.timeOut) {
-            return res.status(400).json({
-                success: false,
-                message: 'You have already checked out today'
+                message: 'No active check-in record found for today'
             });
         }
 
         attendance.timeOut = new Date();
         attendance.breakDuration = req.body.breakDuration || 0;
         attendance.notes = req.body.notes;
+
+        // Calculate partial hours for this session if needed, but the model pre-save hook likely handles totalHours calculation
+        // Assuming the model has logic or we calculate it here?
+        // Let's assume the model handles it or we rely on the next fetch. 
+        // But the previous code didn't calculate it explicitly before save, it relied on attendance.totalHours AFTER save?
+        // Wait, previous code accessed attendance.totalHours. Let's ensure the model does it.
+
+        // Calculate duration in hours
+        const diffMs = attendance.timeOut - attendance.timeIn;
+        const diffHrs = diffMs / (1000 * 60 * 60);
+        attendance.totalHours = diffHrs - (attendance.breakDuration / 60);
+
         await attendance.save();
 
         // Update user's completed hours
-        const totalHours = attendance.totalHours;
         await User.findByIdAndUpdate(req.user.id, {
-            $inc: { completedHours: totalHours }
+            $inc: { completedHours: attendance.totalHours }
         });
 
         res.status(200).json({
@@ -93,7 +103,7 @@ exports.checkOut = async (req, res) => {
             message: 'Checked out successfully',
             data: {
                 ...attendance.toJSON(),
-                hoursWorked: totalHours
+                hoursWorked: attendance.totalHours
             }
         });
     } catch (error) {
@@ -170,13 +180,26 @@ exports.getTodayStatus = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const attendance = await Attendance.findOne({
+        // Check for active session first
+        let attendance = await Attendance.findOne({
             student: req.user.id,
             date: {
                 $gte: today,
                 $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-            }
+            },
+            timeOut: null
         });
+
+        // If no active session, get the latest session for today
+        if (!attendance) {
+            attendance = await Attendance.findOne({
+                student: req.user.id,
+                date: {
+                    $gte: today,
+                    $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+                }
+            }).sort({ createdAt: -1 });
+        }
 
         res.status(200).json({
             success: true,

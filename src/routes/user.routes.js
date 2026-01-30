@@ -8,11 +8,17 @@ const {
     deleteUser,
     getMyStudents,
     assignSupervisor,
-    updateHours
+    updateHours,
+    updateProfile,
+    changePassword
 } = require('../controllers/user.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
 router.use(protect);
+
+// Profile routes (must be before /:id routes)
+router.put('/profile', updateProfile);
+router.put('/change-password', changePassword);
 
 router.route('/')
     .get(authorize('Admin', 'Supervisor'), getUsers)
